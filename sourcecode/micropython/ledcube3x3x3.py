@@ -3,10 +3,13 @@ import utime
 
 class ledcube :
 
-    """a 3x3x3 LED cube controlled with serial connections to µC with 2 SN74HC595 shift register ICs - only 3 pins required
-       - 1 data pin (SN74HC595 SER pin 14) to input 12 bits of data (9 Colums & 3 Levels (rows))
-       - 1 clock pin (SN74HC595 SRCLK pin 11) to shift the data bits into the register
-       - 1 latch pin (SN74HV595 RCLK pin 12) to copy the 12 data bits into the latch register and set the output pins
+    """a 3x3x3 LED cube consisting of 3 levels of 3 by 3 LEDs with all the anodes on each level commoned. Each cathode of the LEDs
+       is connected across the 3 levels into 9 columns. To light a particular LED the level has to be put high and the column low.
+       This is controlled with 2 SN74HC595 shift registers so that only 3 GPIO pins are required on the µC :
+       - 1 data pin (SN74HC595 SER pin 14) to input 9 bits of column data and 3 bits of level data into the data register
+       - 1 clock pin (SN74HC595 SRCLK pin 11) to shift the data bits into the data register
+       - 1 latch pin (SN74HV595 RCLK pin 12) to copy the 12 data bits from the data into the latch register and set the output pins
+       To protect the shift registers, 3 BC547 NPN transistors are used to limit the source current of the level ports (commoned anodes).
        
        the SN74HC595 shift registers are daisy chained :
        shift #1  shift #2  µController
@@ -19,7 +22,7 @@ class ledcube :
         SRCLR# --> SRCLR# --> VCC
         VCC    --> VCC    --> VCC
        
-       the LEDs are connected as follows :
+       the columns and levels of the LEDs are connected to the SN74HC595 shift registers as follows :
        LED  shift #1  shift #2
        ==== ========  ========
         C0 --> QA
@@ -76,8 +79,8 @@ class ledcube :
     
     def shift_data(self, data):
         
-        """ helper function to put data (list of 16 bit values) in the shift registers and to the output pins
-            the SN74HC595 shift registers will be filled as follows:
+        """ helper function to put data (list of 16 bit values) in the data and latch registers and to the output pins
+            the SN74HC595 data registers will be filled as follows:
               shift register #1       shift register #2
             ======================= =======================
             QA QB QC QD QE QF QG QH QA QB QC QD QE QF QG QH <-- SN74HC595
@@ -90,12 +93,12 @@ class ledcube :
         
         # set latch low to begin shifting
         self.la.value(0)
-        # shift bits from bit list into the shift registers
+        # shift bits from bit list into the data registers
         for bit in data:
             self.cl.value(0)
             self.da.value(bit)
             self.cl.value(1)
-        # set latch high to set data to output pins
+        # set latch high to shift into the latch register and to the output pins
         self.la.value(1)
         self.cl.value(0)
         self.da.value(0)
@@ -115,7 +118,7 @@ class ledcube :
            ===========
            C6 -- C7 -- C8  -> back
             |     |     |
-           C3 -- C4 -- C5
+           C3 -- C4 -- C5  -> middle
             |     |     |
            C0 -- C1 -- C2  -> front
  
@@ -133,7 +136,7 @@ class ledcube :
             # start timer
             start_ms = utime.ticks_ms()
             current_ms = start_ms
-            # multiplex levels of LEDs until time_ms has passed
+            # multiplex levels of LEDs until delay_ms has passed
             while current_ms < start_ms + delay_ms:
                 # loop through patterns
                 for idx, pat in enumerate(patterns):
@@ -141,7 +144,7 @@ class ledcube :
                     # complement of bit pattern (low to activate LED) 
                     bits = []
                     bits = [(~int(x) + 2) for x in list('{0:0b}'.format(pat))]
-                    # insert missing 1 bits if necessary - format 
+                    # insert missing 1 bits if necessary 
                     while len(bits) < 9: 
                         bits.insert(0, 1)
                     # insert level bits (high to activate)
