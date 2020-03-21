@@ -424,7 +424,7 @@ FRAME = [
     ]
 
 # instantiate ledcube3x3x3
-lc = ledcube3x3x3.ledcube(DATA, CLOCK, LATCH, debug=True)
+lc = ledcube3x3x3.ledcube(DATA, CLOCK, LATCH, debug=False)
 
 lc.start()
 
